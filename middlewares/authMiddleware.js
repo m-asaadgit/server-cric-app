@@ -43,7 +43,6 @@ const adminMiddleware = async (req, res, next) => {
     if (!isRegistered.isAdmin) {
       return res.status(403).json({ message: "You are not an admin" });
     }
-    console.log(isRegistered)
     req.user = decoded; // Store user info from token
 
     next(); // Proceed to the next middleware or route handler

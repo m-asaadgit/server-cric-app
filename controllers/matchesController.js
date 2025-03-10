@@ -136,6 +136,7 @@ exports.updateMatchDetailsById = async (req, res) => {
       matchId,
       {
         "tossWinner.teamId": tossWinnerTeamId,
+
         "tossWinner.teamName": tossWinnerTeamName,
         "tossWinner.elected": tossDecision,
         aTeamPlayers,
@@ -167,55 +168,6 @@ exports.updateMatchDetailsById = async (req, res) => {
   }
 };
 
-// exports.updateMatchDetailsById = async (req, res) => {
-//   const { matchId } = req.params;
-//   const {
-//     tossWinnerTeamId,
-//     tossLoserTeamId,
-//     tossWinnerTeamName,
-//     tossLooserTeamName,
-//     tossDecision,
-//   } = req.body;
-//   let { aTeamPlayers, bTeamPlayers } = req.body;
-//   var aTeamId = tossLoserTeamId;
-//   var aTeamName = tossWinnerTeamName;
-//   var bTeamId = tossLoserTeamId;
-//   var bTeamName = tossLooserTeamName;
-//   try {
-//     if (tossDecision == "bowlFirst") {
-//       [aTeamPlayers, bTeamPlayers] = [bTeamPlayers, aTeamPlayers];
-
-//       [aTeamId, bTeamId] = [bTeamId, aTeamId];
-//       [aTeamName, bTeamName] = [bTeamName, aTeamName];
-//     }
-//     const updateThisData = await Matches.findByIdAndUpdate(
-//       matchId,
-//       {
-//         "tossWinner.teamId": tossWinnerTeamId,
-//         // "tossWinner.teamId": tossWinnerTeamId,
-//         // "tossWinner.teamId": tossLoserTeamId,
-//         "tossWinner.teamName": tossWinnerTeamName,
-//         "tossWinner.elected": tossDecision,
-//         aTeamPlayers: aTeamPlayers,
-//         bTeamPlayers: bTeamPlayers,
-//       },
-//       { new: true } // Returns the updated document
-//     );
-
-//     if (!updateThisData) {
-//       return res.status(404).json({ message: "Match not found" });
-//     }
-
-//     res
-//       .status(200)
-//       .json({ message: "Match updated successfully", match: updateThisData });
-//   } catch (error) {
-//     res
-//       .status(500)
-//       .json({ message: "Internal Server Error", error: error.message });
-//   }
-// };
-
 exports.updateOpeners = async (req, res) => {
   const { matchId } = req.params;
   const {
@@ -226,7 +178,6 @@ exports.updateOpeners = async (req, res) => {
     bowlerName,
     bowlerId,
   } = req.body;
-
   try {
     const updatedMatch = await Matches.findByIdAndUpdate(
       matchId,
@@ -235,14 +186,13 @@ exports.updateOpeners = async (req, res) => {
         "aTeamInning.0.overNumber.bowlerId": bowlerId,
         "aTeambattingStats.aTeamplayerStats.0.playerId": batter1Id,
         "aTeambattingStats.aTeamplayerStats.0.playerName": batter1Name,
-        "aTeambattingStats.aTeamplayerStats.0.isStrike": true,
+        "aTeambattingStats.aTeamplayerStats.0.methodOfDismissal": "Not out",
         "aTeambattingStats.aTeamplayerStats.1.playerId": batter2Id,
         "aTeambattingStats.aTeamplayerStats.1.playerName": batter2Name,
-        "aTeambattingStats.aTeamplayerStats.1.isStrike": false,
+        "aTeambattingStats.aTeamplayerStats.1.methodOfDismissal": "Not out",
       },
       { new: true } // This option returns the updated document
     );
-
     // Check if a match was found and updated
     if (!updatedMatch) {
       return res.status(404).json({ message: "Match not found" });
@@ -254,66 +204,266 @@ exports.updateOpeners = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating openers:", error);
-    res.status(500).json({ message: "Internal Server Error", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   }
 };
 
-// exports.updateOpeners = async (req, res) => {
-//   const { matchId } = req.params;
-//   const { batter1Name, batter1Id, batter2Name, batter2Id, bowlerName, bowlerId } = req.body;
+exports.ballToBallUpdate = async (req, res) => {
+  const { matchId } = req.params;
+  let {
+    ballNumber,
+    batterName,
+    batterId,
+    runs,
+    dot,
+    single,
+    double,
+    triple,
+    four,
+    six,
+    wide,
+    extra,
+    bye,
+    no_ball,
+    nonextraRuns,
+    caption,
+    wicket,
+    dismissalType,
+    // aTeam,
+    // bTeam,
+    // bowlerName,
+    // bowlerId,
+  } = req.body;
+  let ballFacedByBatter = 0;
+  if (wide && no_ball) {
+    ballFacedByBatter = 1;
+  }
 
-//   try {
-//     const updatedMatch = await Matches.findByIdAndUpdate(
-//       matchId,
-//       {
-//         $set: {
-//           "aTeamInning.0.overNumber.bowlerName": bowlerName,
-//           "aTeamInning.0.overNumber.bowlerId": bowlerId,
-//           "aTeambattingStats.aTeamplayerStats.$[batter1].playerId": batter1Id,
-//           "aTeambattingStats.aTeamplayerStats.$[batter1].playerName": batter1Name,
-//           "aTeambattingStats.aTeamplayerStats.$[batter1].isStrike": true,
-//           "aTeambattingStats.aTeamplayerStats.$[batter2].playerId": batter2Id,
-//           "aTeambattingStats.aTeamplayerStats.$[batter2].playerName": batter2Name,
-//           "aTeambattingStats.aTeamplayerStats.$[batter2].isStrike": false,
-//         },
-//       },
-//       {
-//         new: true, // Return the updated document
-//         arrayFilters: [
-//           { "batter1.playerId": { $exists: true } }, // Match existing batter 1
-//           { "batter2.playerId": { $exists: true } }, // Match existing batter 2
-//         ],
-//       }
-//     );
+  const matchDetails = await Matches.findById(matchId);
+  const overIndex = matchDetails.aTeamInning.filter(
+    (data) => data.overCompleted == "completed"
+  ).length;
+  let inningComplition = overIndex;
 
-//     if (!updatedMatch) {
-//       return res.status(404).json({ message: "Match not found"});
-//     }
+  if (overIndex == matchDetails.overs) {
+    return res
+      .status(500)
+      .send({ success: false, message: "inning completed" });
+  }
+  const overUpdate = matchDetails.aTeamInning[overIndex].balls.filter(
+    (data) => data.extras == false
+  ).length;
 
-//     res.status(200).json({
-//       message: "Openers updated successfully",
-//       match: updatedMatch,
-//       batter1Name:batter1Id
-//     });
-//   } catch (error) {
-//     console.error("Error updating openers:", error);
-//     res.status(500).json({ message: "Internal Server Error", error: error.message });
-//   }
-// };
+  // const IndexCount = Math.floor(ballNumber / 6);
+  try {
+    const matchDetails = await Matches.findByIdAndUpdate(
+      matchId,
+      {
+        $push: {
+          [`aTeamInning.${overIndex}.balls`]: {
+            ballNumber: 1,
+            batsmanName: batterName,
+            batsmanId: batterId,
+            runs: runs,
+            dot: dot,
+            single: single,
+            double: double,
+            triple: triple,
+            four: four,
+            six: six,
+            extras: extra,
+            caption: caption,
+            isWicket: wicket,
+            dismissalType: dismissalType,
+          },
+        },
+        $inc: {
+          "aTeamExtras.byes": bye,
+          "aTeamExtras.wides": wide,
+          "aTeamExtras.noBalls": no_ball,
+        },
+        $inc: {
+          "aTeambattingStats.aTeambattingStats.$[player].runs": nonextraRuns,
+          "aTeambattingStats.aTeambattingStats.$[player].ballsFaced":
+            ballFacedByBatter,
+          "aTeambattingStats.aTeambattingStats.$[player].fours": four ? 1 : 0,
+          "aTeambattingStats.aTeambattingStats.$[player].sixes": six ? 1 : 0,
+          "aTeambattingStats.aTeambattingStats.$[player].singles": single
+            ? 1
+            : 0,
+          "aTeambattingStats.aTeambattingStats.$[player].doubles": double
+            ? 1
+            : 0,
+          "aTeambattingStats.aTeambattingStats.$[player].triples": triple
+            ? 1
+            : 0,
+        },
+      },
+      {
+        arrayFilters: [{ "player.playerId": batterId }],
+        new: true,
+      }
+    );
+    if (wicket) {
+      const matchDetailToUpdateWicketFallen = await Matches.findByIdAndUpdate(
+        matchId,
+        {
+          $set: {
+            "aTeamPlayers.$[player].isOut": true,
+            "aTeamPlayers.$[player].methodOfDismissal": dismissalType,
+            "aTeambattingStats.aTeambattingStats.$[batter].isOut": true,
+            "aTeambattingStats.aTeambattingStats.$[batter].methodOfDismissal":
+              dismissalType,
+          },
+        },
+        {
+          arrayFilters: [
+            { "player.playerId": batterId },
+            { "batter.playerId": batterId },
+          ],
+          new: true,
+        }
+      );
+    }
 
-// players,status
-// exports.updateMatchDetails=async (req,res)=>{
-//   const { id } = req.user;
-//   const { matchId, tossWinner,  tossDecision, aTeamPlayers, bTeamPlayers } = req.body;
+    const overUpdateAfterUpation = matchDetails.aTeamInning[
+      overIndex
+    ].balls.filter((data) => data.extras == false).length;
 
-//   try {
-//     const aTeamStarting11
+    if (overUpdateAfterUpation >= 6) {
+      const overCompleted = await Matches.findByIdAndUpdate(matchId, {
+        $set: {
+          [`aTeamInning.${overIndex}.overCompleted`]: "completed",
+        },
+      });
+      inningComplition += 1;
+    } else {
+      return res.status(200).json({
+        inningComplition: false,
+        matchDetails: matchDetails.aTeamInning,
+        overIndex,
+        overUpdate,
+        overUpdateAfterUpation,
+      });
+    }
 
-//   } catch (error) {
+    if (inningComplition == matchDetails.overs) {
+      return res.status(200).json({
+        inningComplition: true,
+        data: matchDetails,
+        overUpdate: overUpdate,
+        sd: matchDetails.overs,
+      });
+    }
 
-//   }
+    return res.json({
+      inningComplition: false,
+      data: matchDetails,
+      overUpdate: overUpdate,
+      sd: matchDetails.overs,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Failed to update ball details" });
+  }
+};
 
-// }
+exports.updateBowlerAfterOver = async (req, res) => {
+  const { matchId } = req.params;
+  const { bowlerId, bowlerName } = req.body;
+
+  try {
+    const matchDetail = await Matches.findById(matchId);
+    if (!matchDetail) {
+      return res
+        .status(404)
+        .json({ message: "Match not found", success: false });
+    }
+    const overFinished = matchDetail.aTeamInning.filter(
+      (data) => data.overCompleted == "completed"
+    ).length;
+    const updateField = {};
+    updateField[`aTeamInning.${overFinished}.overNumber.bowlerId`] =
+      bowlerId;
+    updateField[`aTeamInning.${overFinished}.overNumber.bowlerName`] =
+      bowlerName;
+    const updatedDetails = await Matches.findByIdAndUpdate(matchDetail, {
+      $set: updateField,
+    });
+    return res.status(200).json({
+      message: updatedDetails,
+      success: true,
+      matchdetail: matchDetail,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error, success: false });
+  }
+};
+
+exports.newBatterAfterWicket = async (req, res) => {
+  const { playerId, playerName } = req.body;
+  const { matchId } = req.params;
+
+  try {
+    const matchDetails = await Matches.findById(matchId);
+
+    // Check if match exists
+    if (!matchDetails) {
+      return res
+        .status(404)
+        .json({ message: "Match not found", success: false });
+    }
+
+    // Ensure aTeambattingStats exists
+    if (
+      !matchDetails.aTeambattingStats ||
+      !Array.isArray(matchDetails.aTeambattingStats.aTeambattingStats)
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Batting stats not found", success: false });
+    }
+
+    // Count the number of out or retired hurt players
+    const indexCount = matchDetails.aTeambattingStats.aTeambattingStats.filter(
+      (player) => player?.isOut || player?.methodOfDismissal === "retired hurt"
+    ).length;
+
+    // Prepare update fields using computed property names
+    const updateField = {};
+    updateField[
+      `aTeambattingStats.aTeambattingStats.${indexCount + 1}.playerId`
+    ] = playerId;
+    updateField[
+      `aTeambattingStats.aTeambattingStats.${indexCount + 1}.playerName`
+    ] = playerName;
+    updateField[
+      `aTeambattingStats.aTeambattingStats.${indexCount + 1}.methodOfDismissal`
+    ] = "Not out";
+
+    // Update the match document
+    const updatedMatch = await Matches.findByIdAndUpdate(
+      matchId,
+      { $set: updateField },
+      { new: true }
+    );
+
+    if (!updatedMatch) {
+      return res
+        .status(404)
+        .json({ message: "Failed to update match", success: false });
+    }
+
+    return res.status(200).json({ matchDetails: updatedMatch, success: true });
+  } catch (error) {
+    console.error("Error updating new batter:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to update ball details", success: false });
+  }
+};
 
 exports.getMatchDetailsById = async (req, res) => {
   try {

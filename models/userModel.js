@@ -35,7 +35,7 @@ userSchema.methods.generateAuthToken = function () {
   return jwt.sign(
     { id: this._id, isAdmin: this.isAdmin },
     process.env.JWT_SECRET, // Replace with your actual secret key
-    { expiresIn: "20h" } // Token expiry time
+    { expiresIn: "20d" } // Token expiry time
   );
 };
 

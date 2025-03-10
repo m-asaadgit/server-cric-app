@@ -14,6 +14,7 @@ const userRoutes = require("./routes/userRoutes");
 const playerRoutes = require("./routes/playerRoutes");
 const teamRoutes = require("./routes/teamRoutes");
 const matchRoutes = require("./routes/matchRoutes");
+const unlistedMatchRoutes = require("./routes/unlistedMatchesRoutes");
 // const matchRoutes = require("./routes/matchRoutes");
 // const tournamentRoutes = require("./routes/tournamentRoutes");
 // const seriesRoutes = require("./routes/seriesRoutes");
@@ -23,6 +24,7 @@ app.use("/api/user", userRoutes);
 app.use("/api/player", playerRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/match", matchRoutes);
+app.use("/api/unlisted-match",unlistedMatchRoutes);
 // app.use("/api/matches", matchRoutes);
 // app.use("/api/tournaments", tournamentRoutes);
   
