@@ -4,7 +4,7 @@ const User = require("../models/userModel");
 
 exports.createMatch = async (req, res) => {
   const { id } = req.user;
-  const { aTeamName, bTeamName, overs, timing } = req.body;
+  const { aTeamName, bTeamName, overs, playersAside, timing } = req.body;
 
   try {
     const aTeamInning = [];
@@ -35,7 +35,7 @@ exports.createMatch = async (req, res) => {
       hostDetail: id,
       teamAName: aTeamName,
       teamBName: bTeamName,
-
+      playersAside: playersAside,
       overs: overs,
       timing: timing,
       aTeamInning,
@@ -101,6 +101,8 @@ exports.updateMatchDetailsById = async (req, res) => {
         "aTeamBowlerStats.teamName": bTeamName,
         "bTeamBowlerStats.teamName": aTeamName,
         status: "In Progress",
+        teamAName: aTeamName,
+        teamBName: bTeamName,
       },
       { new: true } // Returns the updated document
     );
@@ -121,16 +123,28 @@ exports.updateMatchDetailsById = async (req, res) => {
 
 exports.updateOpeners = async (req, res) => {
   const { matchId } = req.params;
-  const { batter1Name, batter2Name, bowlerName } = req.body;
+  const { batter1Name, batter2Name, bowlerName, firstInning } = req.body;
+  let inning = "aTeamInning";
+  let inningStarted="firstInningStarted"
+  let batters = "aTeamBatterStats.aTeambattingStats";
+  let bowlers = "bTeamBowlerStats.bTeamBowlingStats";
+  if (!firstInning) {
+    inningStarted="secondInningStarted"
+    inning = "bTeamInning";
+    batters = "bTeambatterStats.bTeambattingStats";
+    bowlers = "aTeamBowlerStats.aTeamBowlingStats";
+  }
   try {
     const updatedMatch = await Matches.findByIdAndUpdate(
       matchId,
       {
-        "aTeamInning.0.overNumber.bowlerName": bowlerName,
-        "aTeamBatterStats.aTeambattingStats.0.playerName": batter1Name,
-        "aTeamBatterStats.aTeambattingStats.0.methodOfDismissal": "Not out",
-        "aTeamBatterStats.aTeambattingStats.1.playerName": batter2Name,
-        "aTeamBatterStats.aTeambattingStats.1.methodOfDismissal": "Not out",
+        [`${inning}.0.overNumber.bowlerName`]: bowlerName,
+        [`${bowlers}.0.playerName`]: bowlerName,
+        [`${batters}.0.playerName`]: batter1Name,
+        [`${batters}.0.methodOfDismissal`]: "Not out",
+        [`${batters}.1.playerName`]: batter2Name,
+        [`${batters}.1.methodOfDismissal`]: "Not out",
+        [`${inningStarted}`]:true
       },
       { new: true } // This option returns the updated document
     );
@@ -220,9 +234,12 @@ exports.ballToBallUpdate = async (req, res) => {
     caption,
     wicket,
     dismissalType,
+    dismissedVia,
   } = req.body;
   try {
     let inning = "aTeamInning";
+    let battingTeam = "aTeamBatterStats";
+    let bowlingTeam = "bTeambatterStats";
     let battingStat = "aTeamBatterStats.aTeambattingStats";
     let bowlerStat = "bTeamBowlerStats.bTeamBowlingStats";
     let extras = "aTeamExtras";
@@ -230,6 +247,9 @@ exports.ballToBallUpdate = async (req, res) => {
 
     if (firstInning == false) {
       inning = "bTeamInning";
+      battingTeam = "bTeambatterStats";
+      bowlingTeam = "aTeamBatterStats";
+
       battingStat = "bTeambatterStats.bTeambattingStats";
       bowlerStat = "aTeamBowlerStats.aTeamBowlingStats";
       extras = "bTeamExtras";
@@ -238,8 +258,9 @@ exports.ballToBallUpdate = async (req, res) => {
 
     const matchDetailsToExtractData = await Matches.findById(matchId);
     const overUpdatingIndex = matchDetailsToExtractData[inning].filter(
-      (data) => data.overCompleted == "completed"
-    ).length;
+      (data) => data.overCompleted === "completed"
+    )?.length;
+
     let inningComplition = overUpdatingIndex;
 
     if (overUpdatingIndex >= matchDetailsToExtractData.overs) {
@@ -269,13 +290,15 @@ exports.ballToBallUpdate = async (req, res) => {
             extras: extra,
             caption: caption,
             isWicket: wicket,
-            dismissalType: dismissalType,
+            dismissalType: dismissalType && dismissalType,
+            dismissedVia: dismissedVia,
           },
         },
         $inc: {
           [`${extras}.byes`]: bye,
           [`${extras}.wides`]: wide ? 1 : 0,
           [`${extras}.noBalls`]: no_ball ? 1 : 0,
+          [`${battingTeam}.totalRuns`]: runs,
 
           [`${battingStat}.$[batter].runs`]: nonextraRuns,
           [`${battingStat}.$[batter].ballsFaced`]: wide || no_ball ? 0 : 1,
@@ -299,19 +322,26 @@ exports.ballToBallUpdate = async (req, res) => {
         new: true,
       }
     );
+    const overUpdateAfterUpation =
+      matchDetails[inning][overUpdatingIndex].balls.filter(
+        (data) => data.extras === false
+      )?.length || 0;
+    console.log(overUpdateAfterUpation + "cwjiwe");
+    console.log(overUpdatingIndex + "jiwe");
     if (wicket) {
       // Base update query
       const updateQuery = {
         $set: {
           [`${battingStat}.$[batter].isOut`]: true,
           [`${battingStat}.$[batter].methodOfDismissal`]: dismissalType,
+          [`${battingStat}.$[batter].dismissedVia`]: dismissedVia,
         },
       };
 
       // Only add bowler update if dismissalType !== "run out"
       let arrayFilters = [{ "batter.playerName": batterName }];
 
-      if (dismissalType !== "run out") {
+      if (dismissalType !== "Run out") {
         updateQuery.$push = {
           [`${bowlerStat}.$[bowler].wickets`]: { batterName: batterName },
         };
@@ -326,11 +356,169 @@ exports.ballToBallUpdate = async (req, res) => {
           new: true,
         }
       );
-    }
 
-    const overUpdateAfterUpation = matchDetails.aTeamInning[
-      overUpdatingIndex
-    ].balls.filter((data) => data.extras == false).length;
+      if (overUpdateAfterUpation >= 6) {
+        console.log("hi");
+        var overCompleted = await Matches.findByIdAndUpdate(
+          matchId,
+          {
+            $set: {
+              [`${inning}.${overUpdatingIndex}.overCompleted`]: "completed",
+            },
+            $inc: {
+              [`${bowlerStat}.$[bowler].oversBowled`]: 1,
+            },
+          },
+          {
+            arrayFilters: [
+              {
+                "bowler.playerName": bowlerName,
+              },
+            ],
+            new: true,
+          }
+        );
+      }
+      const getNestedProperty = (obj, path) => {
+        return path.split(".").reduce((acc, key) => acc?.[key], obj) || [];
+      };
+
+      const isAllout = getNestedProperty(
+        matchDetailToUpdateWicketFallen,
+        battingStat
+      ).filter((player) => player.isOut === true).length;
+      if (
+        !firstInning &&
+        overCompleted?.[inning].length >= overCompleted?.overs
+      ) {
+        if (
+          matchDetails.aTeamBatterStats.totalRuns ==
+          matchDetails.bTeambatterStats.totalRuns
+        ) {
+          await Matches.findByIdAndUpdate(matchId, {
+            isSuperOver: true,
+          });
+          return res.status(200).json({
+            success: true,
+            matchResult: {
+              draw: true,
+              win: null,
+              loss: null,
+            },
+            inningComplition: true,
+            messege: `match completed`,
+            data: matchDetails,
+          });
+        }
+        if (
+          matchDetails.aTeamBatterStats.totalRuns <
+          matchDetails.bTeambatterStats.totalRuns
+        ) {
+          matchDetails.winner = matchDetails.teamBName;
+          matchDetails.status = "Completed";
+          await matchDetails.save();
+          return res.status(200).json({
+            success: true,
+            matchResult: {
+              draw: false,
+              win: matchDetails.teamBName,
+              loss: matchDetails.teamAName,
+            },
+            inningComplition: true,
+            messege: `match completed`,
+            data: matchDetails,
+          });
+        }
+        if (
+          matchDetails.aTeamBatterStats.totalRuns >
+          matchDetails.bTeambatterStats.totalRuns
+        ) {
+          matchDetails.winner = matchDetails.teamAName;
+          matchDetails.status = "Completed";
+          await matchDetails.save();
+
+          return res.status(200).json({
+            success: true,
+            matchResult: {
+              draw: false,
+              loss: matchDetails.teamBName,
+              win: matchDetails.teamAName,
+            },
+            inningComplition: true,
+            messege: `match completed`,
+            data: matchDetails,
+          });
+        }
+      }
+
+      if (isAllout == matchDetailToUpdateWicketFallen.playersAside - 1) {
+        if (!firstInning) {
+          if (
+            matchDetails.aTeamBatterStats.totalRuns ==
+            matchDetails.bTeambatterStats.totalRuns
+          ) {
+            await Matches.findByIdAndUpdate(matchId, {
+              isSuperOver: true,
+            });
+            return res.status(200).json({
+              success: true,
+              matchResult: {
+                draw: true,
+                win: null,
+                loss: null,
+              },
+              inningComplition: true,
+              messege: `match completed`,
+              data: matchDetails,
+            });
+          }
+          if (
+            matchDetails.aTeamBatterStats.totalRuns <
+            matchDetails.bTeambatterStats.totalRuns
+          ) {
+            matchDetails.winner = matchDetails.teamBName;
+            matchDetails.status = "Completed";
+            await matchDetails.save();
+            return res.status(200).json({
+              success: true,
+              matchResult: {
+                draw: false,
+                win: matchDetails.teamBName,
+                loss: matchDetails.teamAName,
+              },
+              inningComplition: true,
+              messege: `match completed`,
+              data: matchDetails,
+            });
+          }
+          if (
+            matchDetails.aTeamBatterStats.totalRuns >
+            matchDetails.bTeambatterStats.totalRuns
+          ) {
+            matchDetails.winner = matchDetails.teamAName;
+            matchDetails.status = "Completed";
+            await matchDetails.save();
+
+            return res.status(200).json({
+              success: true,
+              matchResult: {
+                draw: false,
+                loss: matchDetails.teamBName,
+                win: matchDetails.teamAName,
+              },
+              inningComplition: true,
+              messege: `match completed`,
+              data: matchDetails,
+            });
+          }
+        }
+        return res.status(200).json({
+          success: true,
+          message: "Allout, Inning",
+          inningComplition: true,
+        });
+      }
+    }
 
     if (overUpdateAfterUpation >= 6) {
       const overCompleted = await Matches.findByIdAndUpdate(
@@ -353,6 +541,107 @@ exports.ballToBallUpdate = async (req, res) => {
         }
       );
       inningComplition += 1;
+      if (!firstInning && overCompleted[inning].length >= overCompleted.overs) {
+        if (
+          matchDetails.aTeamBatterStats.totalRuns ==
+          matchDetails.bTeambatterStats.totalRuns
+        ) {
+          await Matches.findByIdAndUpdate(matchId, {
+            isSuperOver: true,
+          });
+          return res.status(200).json({
+            success: true,
+            matchResult: {
+              draw: true,
+              win: null,
+              loss: null,
+            },
+            inningComplition: true,
+            messege: `match completed`,
+            data: matchDetails,
+          });
+        }
+        if (
+          matchDetails.aTeamBatterStats.totalRuns <
+          matchDetails.bTeambatterStats.totalRuns
+        ) {
+          matchDetails.winner = matchDetails.teamBName;
+          matchDetails.status = "Completed";
+          await matchDetails.save();
+          return res.status(200).json({
+            success: true,
+            matchResult: {
+              draw: false,
+              win: matchDetails.teamBName,
+              loss: matchDetails.teamAName,
+            },
+            inningComplition: true,
+            messege: `match completed`,
+            data: matchDetails,
+          });
+        }
+        if (
+          matchDetails.aTeamBatterStats.totalRuns >
+          matchDetails.bTeambatterStats.totalRuns
+        ) {
+          matchDetails.winner = matchDetails.teamAName;
+          matchDetails.status = "Completed";
+          await matchDetails.save();
+
+          return res.status(200).json({
+            success: true,
+            matchResult: {
+              draw: false,
+              loss: matchDetails.teamBName,
+              win: matchDetails.teamAName,
+            },
+            inningComplition: true,
+            messege: `match completed`,
+            data: matchDetails,
+          });
+        }
+      }
+    }
+    if (!firstInning) {
+      if (
+        matchDetails.aTeamBatterStats.totalRuns <
+        matchDetails.bTeambatterStats.totalRuns
+      ) {
+        matchDetails.winner = matchDetails.teamBName;
+        matchDetails.status = "Completed";
+        await matchDetails.save();
+        return res.status(200).json({
+          success: true,
+          matchResult: {
+            draw: false,
+            win: matchDetails.teamBName,
+            loss: matchDetails.teamAName,
+          },
+          inningComplition: true,
+          messege: `match completed`,
+          data: matchDetails,
+        });
+      }
+      // if (
+      //   matchDetails.aTeamBatterStats.totalRuns >
+      //   matchDetails.bTeambatterStats.totalRuns
+      // ) {
+      //   matchDetails.winner = matchDetails.teamAName;
+      //   matchDetails.status = "Completed";
+      //   await matchDetails.save();
+
+      //   return res.status(200).json({
+      //     success: true,
+      //     matchResult: {
+      //       draw: false,
+      //       loss: matchDetails.teamBName,
+      //       win: matchDetails.teamAName,
+      //     },
+      //     inningComplition: true,
+      //     messege: `match completed`,
+      //     data: matchDetails,
+      //   });
+      // }
     }
 
     if (inningComplition == matchDetails.overs) {
@@ -383,13 +672,18 @@ exports.ballToBallUpdate = async (req, res) => {
     console.error(error);
     return res
       .status(500)
-      .json({ error: error, messege: "something went wrong" });
+      .json({ error: error.messege, messege: "something went wrong" });
   }
 };
 
 exports.updateBowlerAfterOver = async (req, res) => {
   const { matchId } = req.params;
-  const { bowlerId, bowlerName } = req.body;
+  const { firstInning, bowlerName } = req.body; // Ensure both bowlerName and bowlerId are included
+
+  let bowlingPath = "bTeamBowlerStats.bTeamBowlingStats";
+  if (!firstInning) {
+    bowlingPath = "aTeamBowlerStats.aTeamBowlingStats";
+  }
 
   try {
     const matchDetail = await Matches.findById(matchId);
@@ -398,71 +692,85 @@ exports.updateBowlerAfterOver = async (req, res) => {
         .status(404)
         .json({ message: "Match not found", success: false });
     }
-    const overFinished = matchDetail.aTeamInning.filter(
-      (data) => data.overCompleted == "completed"
-    ).length;
-    const updateField = {};
-    updateField[`aTeamInning.${overFinished}.overNumber.bowlerId`] = bowlerId;
-    updateField[`aTeamInning.${overFinished}.overNumber.bowlerName`] =
-      bowlerName;
-    const updatedDetails = await Matches.findByIdAndUpdate(matchDetail, {
-      $set: updateField,
-    });
+
+    // Get the bowling stats array
+    const bowlingStats = bowlingPath
+      .split(".")
+      .reduce((obj, key) => (obj && obj[key] ? obj[key] : null), matchDetail);
+
+    // Check if the bowler already exists in the array
+    const existingBowler = bowlingStats?.find(
+      (bowler) => bowler.playerName === bowlerName
+    );
+
+    if (!existingBowler) {
+      var updatedDetails = await Matches.findByIdAndUpdate(
+        matchId,
+        { $push: { [bowlingPath]: { playerName: bowlerName } } },
+        { new: true }
+      );
+    } else {
+      return res
+        .status(404)
+        .json({ message: "Bowler already exist", success: false });
+    }
+
     return res.status(200).json({
-      message: updatedDetails,
+      message: "Bowler added successfully",
+      bowlingStats,
       success: true,
-      matchdetail: matchDetail,
+      matchDetail: updatedDetails,
     });
   } catch (error) {
-    return res.status(500).json({ message: error, success: false });
+    console.error("Error updating bowler:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal server error", success: false });
   }
 };
 
 exports.newBatterAfterWicket = async (req, res) => {
-  const { playerId, playerName } = req.body;
-  const { matchId } = req.params;
-
   try {
-    const matchDetails = await Matches.findById(matchId);
+    const { batterName, firstInnning } = req.body; // Ensure correct variable name
+    const { matchId } = req.params;
 
-    // Check if match exists
+    if (!batterName) {
+      return res
+        .status(400)
+        .json({ message: "batterName is required", success: false });
+    }
+
+    let batting = "aTeamBatterStats.aTeambattingStats";
+    if (!firstInnning) {
+      batting = "bTeambatterStats.bTeambattingStats";
+    }
+
+    // Find match details
+    const matchDetails = await Matches.findById(matchId);
     if (!matchDetails) {
       return res
         .status(404)
         .json({ message: "Match not found", success: false });
     }
 
-    // Ensure aTeambattingStats exists
-    if (
-      !matchDetails.aTeambattingStats ||
-      !Array.isArray(matchDetails.aTeambattingStats.aTeambattingStats)
-    ) {
-      return res
-        .status(400)
-        .json({ message: "Batting stats not found", success: false });
-    }
-
     // Count the number of out or retired hurt players
-    const indexCount = matchDetails.aTeambattingStats.aTeambattingStats.filter(
+    const indexCount = matchDetails.aTeamBatterStats.aTeambattingStats.filter(
       (player) => player?.isOut || player?.methodOfDismissal === "retired hurt"
     ).length;
 
     // Prepare update fields using computed property names
     const updateField = {};
-    updateField[
-      `aTeambattingStats.aTeambattingStats.${indexCount + 1}.playerId`
-    ] = playerId;
-    updateField[
-      `aTeambattingStats.aTeambattingStats.${indexCount + 1}.playerName`
-    ] = playerName;
-    updateField[
-      `aTeambattingStats.aTeambattingStats.${indexCount + 1}.methodOfDismissal`
-    ] = "Not out";
+    updateField[`${batting}.${indexCount + 1}.playerName`] = batterName;
+    updateField[`${batting}.${indexCount + 1}.methodOfDismissal`] = "Not out";
 
     // Update the match document
     const updatedMatch = await Matches.findByIdAndUpdate(
       matchId,
-      { $set: updateField },
+      {
+        $push: {
+          [batting]: { playerName: batterName },
+        },
+      },
       { new: true }
     );
 
@@ -503,8 +811,10 @@ exports.superOverCreation = async (req, res) => {
     const { matchId } = req.params;
     const { batter1, batter2, batter3, bowler, firstInning } = req.body;
     let inning = "bTeamSuperOverStat";
+    let InningStartedOfSuperOver="firstInningStartedOfSuperOver";
     if (!firstInning) {
       inning = "aTeamSuperOverStat";
+      InningStartedOfSuperOver="secondInningStartedOfSuperOver" 
     }
 
     const matchDetails = await Matches.findByIdAndUpdate(
@@ -512,6 +822,7 @@ exports.superOverCreation = async (req, res) => {
       {
         $set: {
           [`${inning}.bowlerName`]: bowler,
+          [`${InningStartedOfSuperOver}`]: true,
           [`${inning}.batters`]: [
             { batsmanName: batter1 },
             { batsmanName: batter2 },
@@ -553,6 +864,7 @@ exports.superOverBallUpdate = async (req, res) => {
       caption,
       wicket,
       dismissalType,
+      dismissedVia,
     } = req.body;
 
     let inningUpdater = "bTeamSuperOverStat";
@@ -567,10 +879,15 @@ exports.superOverBallUpdate = async (req, res) => {
     }
 
     const matchDetailsToExtractData = await Matches.findById(matchId);
+    if (matchDetailsToExtractData.status === "Completed") {
+      return res
+        .status(400)
+        .json({ message: "Match is already completed", success: false });
+    }
 
-    const ballUpdatingIndex = matchDetailsToExtractData[inningUpdater].balls.filter(
-      (data) => data.extras === false
-    ).length;
+    const ballUpdatingIndex = matchDetailsToExtractData[
+      inningUpdater
+    ].balls.filter((data) => data.extras === false).length;
 
     let nonextraRuns = runs - (bye + wide + no_ball); // Fixing undefined variable
 
@@ -592,6 +909,7 @@ exports.superOverBallUpdate = async (req, res) => {
             caption: caption,
             isWicket: wicket,
             dismissalType: dismissalType,
+            dismissedVia: dismissedVia,
           },
         },
         $inc: {
@@ -600,7 +918,8 @@ exports.superOverBallUpdate = async (req, res) => {
           [`${extras}.noBalls`]: no_ball ? 1 : 0,
           [`${inningUpdater}.runs`]: runs,
           [`${inningUpdater}.batters.$[batter].runs`]: nonextraRuns,
-          [`${inningUpdater}.batters.$[batter].ballsFaced`]: wide || no_ball ? 0 : 1,
+          [`${inningUpdater}.batters.$[batter].ballsFaced`]:
+            wide || no_ball ? 0 : 1,
         },
       },
       {
@@ -629,16 +948,74 @@ exports.superOverBallUpdate = async (req, res) => {
         );
       const isAllOut = matchDetailToUpdateAfterWicketFallen[
         inningUpdater
-      ].batters.filter((batter) => batter.isOut >= 2);
-      if (isAllOut) {
-        return res.status(200).json({
-          success: true,
+      ].batters.filter((batter) => batter.isOut == true);
+      console.log(isAllOut.length);
 
-          isAllOut: true,
-          superOverInningComplition: true,
-          messege: `super over inning    `,
-          data: matchDetailToUpdateAfterWicketFallen,
-        });
+      if (isAllOut.length >= 2) {
+        console.log(isAllOut.length);
+        if (!firstInning) {
+          if (
+            matchDetails[inningDefender].runs ==
+            matchDetails[inningUpdater].runs
+          ) {
+            // await Matches.findByIdAndUpdate(matchId, {
+            //   isSuperOver: true,
+            //   $set: {
+            //     [`${inningUpdater}.overComplete`]: true,
+            //   },
+            // });
+
+            return res.status(200).json({
+              success: true,
+              matchResult: {
+                draw: true,
+                win: null,
+                loss: null,
+              },
+              superOverInningComplition: true,
+              messege: `match draw`,
+              data: matchDetails,
+            });
+          }
+          if (
+            matchDetails[inningDefender].runs < matchDetails[inningUpdater].runs
+          ) {
+            matchDetails.winner = matchDetails.teamAName;
+            matchDetails.status = "Completed";
+            await matchDetails.save();
+            return res.status(200).json({
+              success: true,
+              matchResult: {
+                draw: false,
+                loss: matchDetails.teamBName,
+                win: matchDetails.teamAName,
+              },
+              superOverInningComplition: true,
+              messege: ``,
+              data: matchDetails,
+            });
+          }
+          if (
+            matchDetails[inningDefender].runs > matchDetails[inningUpdater].runs
+          ) {
+            matchDetails.winner = matchDetails.teamBName;
+            matchDetails.status = "Completed";
+            await matchDetails.save();
+
+            return res.status(200).json({
+              success: true,
+              matchResult: {
+                draw: false,
+                win: matchDetails.teamBName,
+                loss: matchDetails.teamAName,
+              },
+              superOverInningComplition: true,
+              messege: `super over inning completed `,
+              data: matchDetails,
+            });
+          }
+        }
+     
       } else {
         return res.status(200).json({
           success: true,
@@ -652,9 +1029,21 @@ exports.superOverBallUpdate = async (req, res) => {
     }
 
     if (!extra && ballUpdatingIndex === 5) {
-      if (firstInning===false) {
-        if (matchDetails[inningDefender].runs == matchDetails[inningUpdater].runs) {
-        console.log("hi")
+      await Matches.findByIdAndUpdate(matchId, {
+        $set: {
+          [`${inningUpdater}.overComplete`]: true,
+        },
+      });
+      if (firstInning === false) {
+        if (
+          matchDetails[inningDefender].runs == matchDetails[inningUpdater].runs
+        ) {
+          await Matches.findByIdAndUpdate(matchId, {
+            isSuperOver: true,
+            $set: {
+              [`${inningUpdater}.overComplete`]: true,
+            },
+          });
 
           return res.status(200).json({
             success: true,
@@ -664,11 +1053,35 @@ exports.superOverBallUpdate = async (req, res) => {
               loss: null,
             },
             superOverInningComplition: true,
-            messege: `super over inning completed `,
+            messege: ``,
             data: matchDetails,
           });
         }
-        if (matchDetails[inningDefender].runs < matchDetails[inningUpdater].runs) {
+        if (
+          matchDetails[inningDefender].runs < matchDetails[inningUpdater].runs
+        ) {
+          matchDetails.winner = matchDetails.teamAName;
+          matchDetails.status = "Completed";
+          await matchDetails.save();
+          return res.status(200).json({
+            success: true,
+            matchResult: {
+              draw: false,
+              loss: matchDetails.teamBName,
+              win: matchDetails.teamAName,
+            },
+            superOverInningComplition: true,
+            messege: ``,
+            data: matchDetails,
+          });
+        }
+        if (
+          matchDetails[inningDefender].runs > matchDetails[inningUpdater].runs
+        ) {
+          matchDetails.winner = matchDetails.teamBName;
+          matchDetails.status = "Completed";
+          await matchDetails.save();
+
           return res.status(200).json({
             success: true,
             matchResult: {
@@ -681,29 +1094,109 @@ exports.superOverBallUpdate = async (req, res) => {
             data: matchDetails,
           });
         }
-        if (matchDetails[inningDefender].runs > matchDetails[inningUpdater].runs) {
-          return res.status(200).json({
-            success: true,
-            matchResult: {
-              draw: false,
-              loss: matchDetails.teamBName,
-              win: matchDetails.teamAName,
-            },
-            superOverInningComplition: true,
-            messege: `super over inning completed `,
-            data: matchDetails,
-          });
-        }
       }
       return res.status(200).json({
         success: true,
-        superOverInningComplition: false,
+        superOverInningComplition: true,
         isAllout: false,
         data: matchDetails,
         message: "Super over inning completed", // Fixed spelling
       });
     }
+    // if (matchDetails[inningDefender].runs < matchDetails[inningUpdater].runs) {
+    //   matchDetails.winner = matchDetails.teamBName;
+    //   matchDetails.status = "Completed";
+    //   await matchDetails.save();
+    //   return res.status(200).json({
+    //     success: true,
+    //     matchResult: {
+    //       draw: false,
+    //       win: matchDetails.teamBName,
+    //       loss: matchDetails.teamAName,
+    //     },
+    //     superOverInningComplition: true,
+    //     messege: `super over inning completed `,
+    //     data: matchDetails,
+    //   });
+    // }
+    // if (matchDetails[inningDefender].runs > matchDetails[inningUpdater].runs) {
+    //   matchDetails.winner = matchDetails.teamAName;
+    //   matchDetails.status = "Completed";
+    //   await matchDetails.save();
 
+    //   return res.status(200).json({
+    //     success: true,
+    //     matchResult: {
+    //       draw: false,
+    //       loss: matchDetails.teamBName,
+    //       win: matchDetails.teamAName,
+    //     },
+    //     superOverInningComplition: true,
+    //     messege: `super over inning completed `,
+    //     data: matchDetails,
+    //   });
+    // }
+    if (firstInning === false) {
+      // if (
+      //   matchDetails[inningDefender].runs == matchDetails[inningUpdater].runs
+      // ) {
+      //   await Matches.findByIdAndUpdate(matchId, {
+      //     isSuperOver: true,
+      //     $set: {
+      //       [`${inningUpdater}.overComplete`]: true,
+      //     },
+      //   });
+
+      //   return res.status(200).json({
+      //     success: true,
+      //     matchResult: {
+      //       draw: true,
+      //       win: null,
+      //       loss: null,
+      //     },
+      //     superOverInningComplition: true,
+      //     messege: ``,
+      //     data: matchDetails,
+      //   });
+      // }
+      if (
+        matchDetails[inningDefender].runs < matchDetails[inningUpdater].runs
+      ) {
+        matchDetails.winner = matchDetails.teamBName;
+        matchDetails.status = "Completed";
+        await matchDetails.save();
+        return res.status(200).json({
+          success: true,
+          matchResult: {
+            draw: false,
+            win: matchDetails.teamAName,
+            loss: matchDetails.teamBName,
+          },
+          superOverInningComplition: true,
+          messege: ``,
+          data: matchDetails,
+        });
+      }
+      // if (
+      //   matchDetails[inningDefender].runs > matchDetails[inningUpdater].runs
+      // ) {
+      //   matchDetails.winner = matchDetails.teamAName;
+      //   matchDetails.status = "Completed";
+      //   await matchDetails.save();
+
+      //   return res.status(200).json({
+      //     success: true,
+      //     matchResult: {
+      //       draw: false,
+      //       loss: matchDetails.teamBName,
+      //       win: matchDetails.teamAName,
+      //     },
+      //     superOverInningComplition: true,
+      //     messege: `super over inning completed `,
+      //     data: matchDetails,
+      //   });
+      // }
+    }
     return res.json({
       success: true,
       data: matchDetails,
