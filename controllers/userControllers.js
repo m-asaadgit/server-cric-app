@@ -1,9 +1,12 @@
 const User = require("../models/userModel");
 const Blacklist = require("../models/blacklistModel");
+const UnlistedMatches = require("../models/NonListingMatchModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
+const series = require("../models/seriesModel");
+const tournament = require("../models/tournamentModel");
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -106,11 +109,13 @@ exports.verifySignup = async (req, res) => {
 };
 
 // Token verification and user email check
- exports.verifyToken = async (req, res) => {
+exports.verifyToken = async (req, res) => {
   const token = req.body.token; // Token sent from the client
 
   if (!token) {
-    return res.status(400).json({ success: false, message: "Token is required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Token is required" });
   }
 
   try {
@@ -118,20 +123,28 @@ exports.verifySignup = async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Check if the email exists in the Users collection
-    const user = await User.findOne({ email: decoded.email }).select("-password -email -isVerified ")
+    const user = await User.findOne({ email: decoded.email }).select(
+      "-password -email -isVerified "
+    );
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
-console.log(user)
+    console.log(user);
     // Token and user verified
     return res.status(200).json({
       success: true,
       message: "Token is verified",
       user: { _id: user._id, email: user.email },
-      decoded
+      decoded,
     });
   } catch (err) {
-    return res.status(401).json({ success: false, message: "Invalid or expired token",error:err });
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired token",
+      error: err,
+    });
   }
 };
 
@@ -143,13 +156,11 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ message: "Invalid email " });
 
-   
-
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect)
       return res.status(400).json({ message: "Invalid password" });
 
-    const token = user.generateAuthToken()
+    const token = user.generateAuthToken();
     res.status(200).json({ token, message: "Logged in successfully" });
   } catch (err) {
     res
@@ -205,7 +216,9 @@ exports.requestResetPassword = async (req, res) => {
 `,
     });
 
-    res.status(200).json({ message: "Password reset email sent.",token:resetToken });
+    res
+      .status(200)
+      .json({ message: "Password reset email sent.", token: resetToken });
   } catch (error) {
     res
       .status(500)
@@ -213,19 +226,16 @@ exports.requestResetPassword = async (req, res) => {
   }
 };
 
-
-
 exports.resetPassword = async (req, res) => {
   const { id } = req.params; // Extract token from URL
 
   // Debugging logs
-  
 
   if (!id) {
     return res.status(400).json({ message: "can't change password" });
   }
-  const expiredToken = await Blacklist.findOne({token:id})
-  if(expiredToken){
+  const expiredToken = await Blacklist.findOne({ token: id });
+  if (expiredToken) {
     return res.status(400).json({ message: "Link expired" });
   }
 
@@ -240,7 +250,7 @@ exports.resetPassword = async (req, res) => {
     // const hashedPassword = await bcrypt.hash(newPassword, 12); // Hash the new password
     user.password = newPassword;
     await user.save();
-    await Blacklist.create({token:id})
+    await Blacklist.create({ token: id });
 
     res.status(200).json({ message: "Password reset successfully" });
   } catch (error) {
@@ -249,5 +259,142 @@ exports.resetPassword = async (req, res) => {
       message: "time has expired",
       error: error.message,
     });
+  }
+};
+
+exports.getUserDetails = async (req, res) => {
+  const { token } = req.params;
+
+  try {
+    // Verify the JWT token and extract user ID
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Find user and exclude sensitive fields
+    const isUserExist = await User.findById(decoded.id).select(
+      "-password -updatedAt -createdAt"
+    );
+
+    if (!isUserExist) {
+      return res
+        .status(401)
+        .json({ message: "User does not exist", success: false });
+    }
+
+    // Fetch matches hosted by the user
+    const matchesHosted = await Promise.all([
+      series.find({ hostId: isUserExist._id }).select("_id name type"),
+      tournament.find({ hostId: isUserExist._id }).select("_id name type"),
+    ]);
+
+    const combinedMatches = [...matchesHosted[0], ...matchesHosted[1]];
+
+    return res.status(200).json({
+      message: "Token verified successfully",
+      success: true,
+      userId: isUserExist.id,
+      userName: isUserExist.name,
+      isAdmin: isUserExist.isAdmin,
+      hostedTournamentsAndSeries: combinedMatches,
+    });
+  } catch (error) {
+    return res.status(401).json({
+      message: "Invalid or expired token",
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+exports.adminVerificationForEvent = async (req, res) => {
+  const token = req.header("Authorization")?.replace("Bearer ", "");
+  const { eventId } = req.params;
+
+  if (!token) {
+    return res
+      .status(401)
+      .json({ message: "Access denied. No token provided." });
+  }
+
+  try {
+    // Verify the JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Check if the user exists and has admin privileges
+    const isRegistered = await User.findById(decoded.id);
+    if (!isRegistered) {
+      return res.status(400).json({ message: "User not registered", decoded });
+    }
+    if (!isRegistered.isAdmin) {
+      return res.status(403).json({ message: "You are not an admin" });
+    }
+
+    // Fetch match details from tournament or series
+    const unlistedMatchDetails =
+      (await tournament.findById(eventId).select("hostId")) ??
+      (await series.findById(eventId).select("hostId"));
+
+    // Check if match details exist
+    if (!unlistedMatchDetails) {
+      return res.status(404).json({ message: "Match not found" });
+    }
+    console.log(decoded.id, unlistedMatchDetails.hostId);
+
+    // Check if the user is authorized to update the match
+    if (decoded.id != unlistedMatchDetails.hostId) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to update this match ScoreCard",
+      });
+    }
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Error in adminMiddleware:", error);
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid token or server error" });
+  }
+};
+exports.adminVerificationForMatch = async (req, res) => {
+  const token = req.header("Authorization")?.replace("Bearer ", "");
+  const { matchId } = req.params;
+
+  if (!token) {
+    return res.status(401).json({ message: "Access denied. No token provided." });
+  }
+
+  try {
+    // Verify JWT token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Check if the user exists and has admin privileges
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(400).json({ message: "User not registered" });
+    }
+    if (!user.isAdmin) {
+      return res.status(403).json({ message: "You are not an admin" });
+    }
+
+    // Fetch match details
+    const matchData = await UnlistedMatches.findById(matchId);
+
+    // Check if match exists
+    if (!matchData) {
+      return res.status(404).json({ message: "Match not found" });
+    }
+
+    // Check if the user is authorized to update the match
+    if (decoded.id !== matchData.hostDetail.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to update this match ScoreCard",
+      });
+    }
+
+    return res.status(200).json({ success: true,matchData:matchData });
+  } catch (error) {
+    console.error("Error in adminVerificationForMatch:", error);
+    return res.status(400).json({ success: false, message: "Invalid token or server error" });
   }
 };

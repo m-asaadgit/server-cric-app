@@ -81,9 +81,7 @@ const adminMiddlewareForMatchCreation = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     // Check if user is registered and if they have admin privileges
     const isRegistered = await User.findById(decoded.id);
-    const unlistedMatchDetails = await unlistedMatches
-      .findById(matchId)
-      .select("hostDetail");
+ 
 
     if (!isRegistered) {
       return res

@@ -381,12 +381,16 @@ exports.updateBowlerAfterOver = async (req, res) => {
         .status(404)
         .json({ message: "Match not found", success: false });
     }
+    if (matchDetail.chooseNextBowler == false) {
+      return res
+        .status(500)
+        .json({ message: "cannot updat bowler", success: false });
+    }
     const overFinished = matchDetail.aTeamInning.filter(
       (data) => data.overCompleted == "completed"
     ).length;
     const updateField = {};
-    updateField[`aTeamInning.${overFinished}.overNumber.bowlerId`] =
-      bowlerId;
+    updateField[`aTeamInning.${overFinished}.overNumber.bowlerId`] = bowlerId;
     updateField[`aTeamInning.${overFinished}.overNumber.bowlerName`] =
       bowlerName;
     const updatedDetails = await Matches.findByIdAndUpdate(matchDetail, {
@@ -407,7 +411,7 @@ exports.newBatterAfterWicket = async (req, res) => {
   const { matchId } = req.params;
 
   try {
-    const matchDetails = await Matches.findById(matchId);
+    var matchDetails = await Matches.findById(matchId);
 
     // Check if match exists
     if (!matchDetails) {
@@ -415,7 +419,16 @@ exports.newBatterAfterWicket = async (req, res) => {
         .status(404)
         .json({ message: "Match not found", success: false });
     }
-
+    if (matchDetails.addNewBatter == false) {
+      return res
+        .status(500)
+        .json({
+          message: "cannot update batter",
+          success: false,
+          istrue: matchDetails.addNewBatter,
+        });
+      console.log(matchDetails.addNewBatter);
+    }
     // Ensure aTeambattingStats exists
     if (
       !matchDetails.aTeambattingStats ||
@@ -425,6 +438,7 @@ exports.newBatterAfterWicket = async (req, res) => {
         .status(400)
         .json({ message: "Batting stats not found", success: false });
     }
+  
 
     // Count the number of out or retired hurt players
     const indexCount = matchDetails.aTeambattingStats.aTeambattingStats.filter(
@@ -456,7 +470,14 @@ exports.newBatterAfterWicket = async (req, res) => {
         .json({ message: "Failed to update match", success: false });
     }
 
-    return res.status(200).json({ matchDetails: updatedMatch, success: true });
+    return res
+      .status(200)
+      .json({
+        matchDetails: matchDetails.addNewBatter,
+        success: true,
+        istrue: matchDetails.addNewBatter,
+        dnehdn:"c4rf54"
+      });
   } catch (error) {
     console.error("Error updating new batter:", error);
     res

@@ -9,11 +9,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     isAdmin: { type: Boolean, required: true, default: false },
     matchsHosted: [{ type: mongoose.Schema.Types.ObjectId, ref: "Matches" }],
-    tournamentHosted: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Tournament",
-    }],
-    seriesHosted: [{ type: mongoose.Schema.Types.ObjectId, ref: "Series" }],
+  
   },
 
   {
@@ -34,8 +30,7 @@ userSchema.pre("save", async function (next) {
 userSchema.methods.generateAuthToken = function () {
   return jwt.sign(
     { id: this._id, isAdmin: this.isAdmin },
-    process.env.JWT_SECRET, // Replace with your actual secret key
-    { expiresIn: "20d" } // Token expiry time
+    process.env.JWT_SECRET // Replace with your actual secret key
   );
 };
 

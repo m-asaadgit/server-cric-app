@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-
 const matchSchema = new mongoose.Schema(
   {
     hostDetail: {
@@ -7,28 +6,35 @@ const matchSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    matchType: {
+      type: String,
+      default: null,
+    },
     teamAName: {
-      //   teamId: {
-      //     type: mongoose.Schema.Types.ObjectId,
-      //     ref: "Teams",
-      //     required: true,
-      //   },
-      //   teamName: {
       type: String,
       required: true,
-      //   },
     },
     teamBName: {
-      //   teamId: {
-      //     type: mongoose.Schema.Types.ObjectId,
-      //     ref: "Teams",
-      //     required: true,
-      //   },
-      // //   teamName: {
       type: String,
       required: true,
-      //   },
     },
+    addNewBatter: {
+      type: Boolean,
+      default: false,
+    },
+    chooseNextBowler: {
+      type: Boolean,
+      default: false,
+    },
+    isSuperOver: {
+      type: Boolean,
+      default: false,
+    },
+    resultMessege: {
+      type: String,
+      default: null,
+    },
+
     firstInningStarted: {
       type: Boolean,
       default: false,
@@ -45,6 +51,22 @@ const matchSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    firstInningEnded: {
+      type: Boolean,
+      default: false,
+    },
+    secondInningEnded: {
+      type: Boolean,
+      default: false,
+    },
+    firstInningEndedOfSuperOver: {
+      type: Boolean,
+      default: false,
+    },
+    secondInningEndedOfSuperOver: {
+      type: Boolean,
+      default: false,
+    },
 
     timing: { type: Date, default: null },
 
@@ -58,14 +80,8 @@ const matchSchema = new mongoose.Schema(
     },
 
     tossWinner: {
-      //   teamId: {
-      //     type: mongoose.Schema.Types.ObjectId,
-      //     ref: "Teams",
-      //     default: null,
-      //   },
-
       teamName: { type: String },
-      elected: { type: String, enum: ["batFirst", "bowlFirst"] },
+      elected: { type: String, enum: ["Bat First", "Bowl First"] },
     },
 
     // Each over is an array of 6 balls
@@ -93,11 +109,22 @@ const matchSchema = new mongoose.Schema(
             batsmanName: {
               type: String,
             },
-            // batsmanId: {
-            //   type: mongoose.Schema.Types.ObjectId,
-            //   ref: "Players",
-            // default: null,
-            // },
+            currentTotalBalls: {
+              type: Number,
+              default: 0,
+            },
+            currentTotalRuns: {
+              type: Number,
+              default: 0,
+            },
+            currentTotalWickets: {
+              type: Number,
+              default: 0,
+            },
+            OverThrow: {
+              type: Number,
+              default: 0,
+            },
             runs: {
               type: Number,
             },
@@ -122,7 +149,18 @@ const matchSchema = new mongoose.Schema(
             extras: {
               type: Boolean,
               default: false,
-              enum: ["wide", "no ball", "bye"],
+            },
+            wide: {
+              type: Boolean,
+              default: false,
+            },
+            byes: {
+              type: Boolean,
+              default: false,
+            },
+            noBall: {
+              type: Boolean,
+              default: false,
             },
             caption: { type: String },
             isWicket: {
@@ -134,15 +172,16 @@ const matchSchema = new mongoose.Schema(
               enum: [
                 "Caught",
                 "Sub Caught",
-                "Caught behind",
-                "yet to bat",
+                "Caught Behind",
+                "Yet To Bat",
                 "Bowled",
-                "retired hurt",
-                "Run out",
-                "stump out",
-                "Not out",
+                "Retired Hurt",
+                "Run Out",
+                "Stump Out",
+                "Not Out",
+                "LBW",
               ],
-              default: "yet to bat",
+              default: "Yet To Bat",
             },
             dismissedVia: {
               type: String,
@@ -176,11 +215,18 @@ const matchSchema = new mongoose.Schema(
             batsmanName: {
               type: String,
             },
-            // batsmanId: {
-            //   type: mongoose.Schema.Types.ObjectId,
-            //   ref: "Players",
-            // default: null,
-            // },
+            currentTotalRuns: {
+              type: Number,
+              default: 0,
+            },
+            currentTotalBalls: {
+              type: Number,
+              default: 0,
+            },
+            currentTotalWickets: {
+              type: Number,
+              default: 0,
+            },
             runs: {
               type: Number,
             },
@@ -205,7 +251,18 @@ const matchSchema = new mongoose.Schema(
             extras: {
               type: Boolean,
               default: false,
-              enum: ["wide", "no ball", "bye"],
+            },
+            wide: {
+              type: Boolean,
+              default: false,
+            },
+            byes: {
+              type: Boolean,
+              default: false,
+            },
+            noBall: {
+              type: Boolean,
+              default: false,
             },
             caption: { type: String },
             isWicket: {
@@ -217,15 +274,16 @@ const matchSchema = new mongoose.Schema(
               enum: [
                 "Caught",
                 "Sub Caught",
-                "Caught behind",
-                "yet to bat",
+                "Caught Behind",
+                "Yet To Bat",
                 "Bowled",
-                "retired hurt",
-                "Run out",
-                "stump out",
-                "Not out",
+                "Retired Hurt",
+                "Run Out",
+                "Stump Out",
+                "Not Out",
+                "LBW",
               ],
-              default: "yet to bat",
+              default: "Yet To Bat",
             },
             dismissedVia: {
               type: String,
@@ -235,6 +293,23 @@ const matchSchema = new mongoose.Schema(
         ],
       },
     ],
+    aTeamFallOfWicket: [
+      {
+        batterName: { type: String },
+        ballNumber: { type: Number },
+        runs: { type: Number },
+        wickets: { type: Number },
+      },
+    ],
+    bTeamFallOfWicket: [
+      {
+        batterName: { type: String },
+
+        ballNumber: { type: Number },
+        runs: { type: Number },
+        wickets: { type: Number },
+      },
+    ],
 
     aTeamPlayers: [
       {
@@ -242,15 +317,39 @@ const matchSchema = new mongoose.Schema(
           type: String,
           default: "",
         },
+        isOutSuperOver: {
+          type: Boolean,
+          default: false,
+        },
 
         isOut: {
           type: Boolean,
           default: false,
         },
+        outOnBallNumber: {
+          type: Number,
+          default: 0,
+        },
 
         isTwelfthMan: {
           type: Boolean,
           default: false,
+        },
+        methodOfDismissal: {
+          type: String,
+          enum: [
+            "Caught",
+            "Sub Caught",
+            "Caught Behind",
+            "Yet To Bat",
+            "Bowled",
+            "Retired Hurt",
+            "Run Out",
+            "Stump Out",
+            "Not Out",
+            "LBW",
+          ],
+          default: "Yet To Bat",
         },
       },
     ],
@@ -264,9 +363,29 @@ const matchSchema = new mongoose.Schema(
           type: Boolean,
           default: false,
         },
+        isOutSuperOver: {
+          type: Boolean,
+          default: false,
+        },
         isTwelfthMan: {
           type: Boolean,
           default: false,
+        },
+        methodOfDismissal: {
+          type: String,
+          enum: [
+            "Caught",
+            "Sub Caught",
+            "Caught Behind",
+            "Yet To Bat",
+            "Bowled",
+            "Retired Hurt",
+            "Run Out",
+            "Stump Out",
+            "Not Out",
+            "LBW",
+          ],
+          default: "Yet To Bat",
         },
       },
     ],
@@ -278,21 +397,63 @@ const matchSchema = new mongoose.Schema(
     aTeamSuperOverStat: {
       bowlerName: { type: String },
       runs: { type: Number, default: 0 },
-
+      boundaries: {
+        type: Number,
+        default: 0,
+      },
       batters: [
         {
           batsmanName: { type: String, required: true },
           runs: { type: Number, default: 0 },
+          wicketTaker: {
+            type: String,
+          },
+
           ballsFaced: { type: Number, default: 0 },
           isOut: {
             type: Boolean,
             default: false,
+          },
+
+          four: {
+            type: Number,
+          },
+          six: {
+            type: Number,
+          },
+          dismissedVia: {
+            type: String,
+          },
+          methodOfDismissal: {
+            type: String,
+            enum: [
+              "Caught",
+              "Sub Caught",
+              "Caught Behind",
+              "Yet To Bat",
+              "Bowled",
+              "Retired Hurt",
+              "Run Out",
+              "Stump Out",
+              "Not Out",
+              "LBW",
+            ],
+            default: "Yet To Bat",
           },
         },
       ],
       overComplete: { type: Boolean, default: false },
       balls: [
         {
+          ballNumber: {
+            type: Number,
+          },
+          currentTotalRuns: {
+            type: Number,
+          },
+          currentTotalWickets: {
+            type: Number,
+          },
           ballNumber: {
             type: Number,
           },
@@ -324,7 +485,6 @@ const matchSchema = new mongoose.Schema(
           extras: {
             type: Boolean,
             default: false,
-            enum: ["wide", "no ball", "bye"],
           },
           caption: { type: String },
           isWicket: {
@@ -336,15 +496,16 @@ const matchSchema = new mongoose.Schema(
             enum: [
               "Caught",
               "Sub Caught",
-              "Caught behind",
-              "yet to bat",
+              "Caught Behind",
+              "Yet To Bat",
               "Bowled",
-              "retired hurt",
-              "Run out",
-              "stump out",
-              "Not out",
+              "Retired Hurt",
+              "Run Out",
+              "Stump Out",
+              "Not Out",
+              "LBW",
             ],
-            default: "yet to bat",
+            default: "Yet To Bat",
           },
           dismissedVia: {
             type: String,
@@ -355,14 +516,48 @@ const matchSchema = new mongoose.Schema(
     },
     bTeamSuperOverStat: {
       bowlerName: { type: String },
+      boundaries: {
+        type: Number,
+        default: 0,
+      },
       batters: [
         {
           batsmanName: { type: String, required: true },
+          wicketTaker: {
+            type: String,
+          },
+
           isOut: { type: Boolean, default: false },
           runs: { type: Number, default: 0 },
+          four: {
+            type: Number,
+          },
+          six: {
+            type: Number,
+          },
+          dismissedVia: {
+            type: String,
+          },
           ballsFaced: { type: Number, default: 0 },
+          methodOfDismissal: {
+            type: String,
+            enum: [
+              "Caught",
+              "Sub Caught",
+              "Caught Behind",
+              "Yet To Bat",
+              "Bowled",
+              "Retired Hurt",
+              "Run Out",
+              "Stump Out",
+              "Not Out",
+              "LBW",
+            ],
+            default: "Yet To Bat",
+          },
         },
       ],
+
       runs: { type: Number, default: 0 },
       overComplete: { type: Boolean, default: false },
       balls: [
@@ -373,7 +568,12 @@ const matchSchema = new mongoose.Schema(
           batsmanName: {
             type: String,
           },
-
+          currentTotalRuns: {
+            type: Number,
+          },
+          currentTotalWickets: {
+            type: Number,
+          },
           runs: {
             type: Number,
           },
@@ -409,15 +609,16 @@ const matchSchema = new mongoose.Schema(
             enum: [
               "Caught",
               "Sub Caught",
-              "Caught behind",
-              "yet to bat",
+              "Caught Behind",
+              "Yet To Bat",
               "Bowled",
-              "retired hurt",
-              "Run out",
-              "stump out",
-              "Not out",
+              "Retired Hurt",
+              "Run Out",
+              "Stump Out",
+              "Not Out",
+              "LBW",
             ],
-            default: "yet to bat",
+            default: "Yet To Bat",
           },
           dismissedVia: {
             type: String,
@@ -432,8 +633,20 @@ const matchSchema = new mongoose.Schema(
       teamName: {
         type: String,
       },
+      boundaries: {
+        type: Number,
+        default: 0,
+      },
+      ballsFaced: { type: Number, default: 0 },
+      ballsYetToFace: { type: Number, default: 0 },
+
       totalRuns: {
         type: Number,
+        default: 0,
+      },
+      totalWickets: {
+        type: Number,
+        default: 0,
       },
       inningComplete: {
         type: Boolean,
@@ -444,6 +657,9 @@ const matchSchema = new mongoose.Schema(
             type: String,
             required: true,
           },
+          wicketTaker: {
+            type: String,
+          },
 
           runs: {
             type: Number,
@@ -465,15 +681,16 @@ const matchSchema = new mongoose.Schema(
             enum: [
               "Caught",
               "Sub Caught",
-              "Caught behind",
-              "yet to bat",
+              "Caught Behind",
+              "Yet To Bat",
               "Bowled",
-              "retired hurt",
-              "Run out",
-              "stump out",
-              "Not out",
+              "Retired Hurt",
+              "Run Out",
+              "Stump Out",
+              "Not Out",
+              "LBW",
             ],
-            default: "yet to bat",
+            default: "Yet To Bat",
           },
           dismissedVia: {
             type: String,
@@ -483,21 +700,36 @@ const matchSchema = new mongoose.Schema(
       ],
     },
     // Player-specific stats for batting
-    bTeambatterStats: {
+    bTeamBatterStats: {
       teamName: {
         type: String,
+      },
+      boundaries: {
+        type: Number,
+        default: 0,
       },
       inningComplete: {
         type: Boolean,
       },
+      totalWickets: {
+        type: Number,
+        default: 0,
+      },
+      ballsFaced: { type: Number, default: 0 },
+      ballsYetToFace: { type: Number, default: 0 },
+
       totalRuns: {
         type: Number,
+        default: 0,
       },
       bTeambattingStats: [
         {
           playerName: {
             type: String,
             required: true,
+          },
+          wicketTaker: {
+            type: String,
           },
 
           runs: {
@@ -521,15 +753,16 @@ const matchSchema = new mongoose.Schema(
             enum: [
               "Caught",
               "Sub Caught",
-              "Caught behind",
-              "yet to bat",
+              "Caught Behind",
+              "Yet To Bat",
               "Bowled",
-              "retired hurt",
-              "Run out",
-              "stump out",
-              "Not out",
+              "Retired Hurt",
+              "Run Out",
+              "Stump Out",
+              "Not Out",
+              "LBW",
             ],
-            default: "yet to bat",
+            default: "Yet To Bat",
           },
           dismissedVia: {
             type: String,
@@ -549,6 +782,7 @@ const matchSchema = new mongoose.Schema(
         {
           playerName: { type: String, required: true },
           oversBowled: { type: Number, default: 0 },
+          ballsBowled: { type: Number, default: 0 },
           runsConceded: { type: Number, default: 0 },
           wickets: [
             {
@@ -571,6 +805,8 @@ const matchSchema = new mongoose.Schema(
         {
           playerName: { type: String, required: true },
           oversBowled: { type: Number, default: 0 },
+          ballsBowled: { type: Number, default: 0 },
+
           runsConceded: { type: Number, default: 0 },
           wickets: [
             {
@@ -586,6 +822,17 @@ const matchSchema = new mongoose.Schema(
     },
 
     // Extras and other match details
+    aTeamExtrasOfSuperOver: {
+      byes: { type: Number, default: 0 },
+      wides: { type: Number, default: 0 },
+      noBalls: { type: Number, default: 0 },
+    },
+
+    bTeamExtrasOfSuperOver: {
+      byes: { type: Number, default: 0 },
+      wides: { type: Number, default: 0 },
+      noBalls: { type: Number, default: 0 },
+    },
     aTeamExtras: {
       byes: { type: Number, default: 0 },
       wides: { type: Number, default: 0 },
@@ -597,6 +844,17 @@ const matchSchema = new mongoose.Schema(
       wides: { type: Number, default: 0 },
       noBalls: { type: Number, default: 0 },
     },
+    aTeamExtrasOfSuperOver: {
+      byes: { type: Number, default: 0 },
+      wides: { type: Number, default: 0 },
+      noBalls: { type: Number, default: 0 },
+    },
+
+    bTeamExtrasOfSuperOver: {
+      byes: { type: Number, default: 0 },
+      wides: { type: Number, default: 0 },
+      noBalls: { type: Number, default: 0 },
+    },
 
     // Match status and winner
     status: {
@@ -604,11 +862,17 @@ const matchSchema = new mongoose.Schema(
       enum: ["Not Started", "In Progress", "Completed"],
       default: "Not Started",
     },
+    superOverResult:{
+      type:String,
+
+    },
 
     winner: {
       type: String,
       default: null,
     },
+    tournamentId: { type: mongoose.Schema.Types.ObjectId, ref: "Tournament" },
+    seriesId: { type: mongoose.Schema.Types.ObjectId, ref: "Series" },
 
     MOM: {
       playerName: {
