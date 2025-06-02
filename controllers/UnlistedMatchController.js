@@ -1,8 +1,5 @@
-const { isAllOf } = require("@reduxjs/toolkit");
 const Matches = require("../models/NonListingMatchModel");
 const User = require("../models/userModel");
-const series = require("../models/seriesModel");
-const tournament = require("../models/tournamentModel");
 
 exports.updateBowlerAfterOver = async (req, res) => {
   const { matchId } = req.params;
