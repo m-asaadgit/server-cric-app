@@ -187,7 +187,7 @@ exports.requestResetPassword = async (req, res) => {
     );
 
     // Send reset link via email
-    const resetLink = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+    const resetLink = `${process.env.CLIENT_URL}reset-password/${resetToken}`;
     await transporter.sendMail({
       to: user.email,
       subject: "Password Reset",
