@@ -74,3 +74,39 @@ io.on("connection", (socket) => {
 // Server Start
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+
+
+
+// {
+//   "name": "server",
+//   "version": "1.0.0",
+//   "description": "",
+//   "main": "index.js",
+//   "scripts": {
+//     "test": "echo \"Error: no test specified\" && exit 1",
+//     "start": "nodemon server.js"
+//   },
+//   "keywords": [],
+//   "author": "",
+//   "license": "ISC",
+//   "dependencies": {
+//     "apollo-server-express": "^3.13.0",
+//     "bcrypt": "^5.1.1",
+//     "bcryptjs": "^2.4.3",
+//     "body-parser": "^1.20.3",
+//     "cors": "^2.8.5",
+//     "crypto": "^1.0.1",
+//     "dotenv": "^16.4.7",
+//     "express": "^4.21.2",
+//     "express-session": "^1.18.1",
+//     "graphql": "^16.10.0",
+//     "helmet": "^8.1.0",
+//     "json-web-token": "^3.2.0",
+//     "mongoose": "^8.9.6",
+//     "nodemailer": "^6.10.0",
+//     "nodemon": "^3.1.9",
+//     "otp-generator": "^4.0.1",
+//     "socket.io": "^4.8.1"
+//   }
+// }
